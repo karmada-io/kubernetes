@@ -25,6 +25,7 @@ import (
 	"time"
 
 	clusterv1alpha1 "github.com/karmada-io/karmada/pkg/apis/cluster/v1alpha1"
+	"github.com/karmada-io/karmada/pkg/util"
 
 	"k8s.io/klog/v2"
 
@@ -39,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/selection"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -348,6 +350,12 @@ func (e *Store) List(ctx context.Context, options *metainternalversion.ListOptio
 	if options != nil && options.LabelSelector != nil {
 		label = options.LabelSelector
 	}
+	require, err := labels.NewRequirement(util.ManagedByKarmadaLabel, selection.NotEquals, []string{util.ManagedByKarmadaLabelValue})
+	if err != nil {
+		return nil, err
+	}
+	label = label.Add(*require)
+
 	field := fields.Everything()
 	if options != nil && options.FieldSelector != nil {
 		field = options.FieldSelector
@@ -1408,6 +1416,12 @@ func (e *Store) Watch(ctx context.Context, options *metainternalversion.ListOpti
 	if options != nil && options.LabelSelector != nil {
 		label = options.LabelSelector
 	}
+	require, err := labels.NewRequirement(util.ManagedByKarmadaLabel, selection.NotEquals, []string{util.ManagedByKarmadaLabelValue})
+	if err != nil {
+		return nil, err
+	}
+	label = label.Add(*require)
+
 	field := fields.Everything()
 	if options != nil && options.FieldSelector != nil {
 		field = options.FieldSelector
