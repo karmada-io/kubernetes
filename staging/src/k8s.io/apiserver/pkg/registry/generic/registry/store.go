@@ -362,15 +362,10 @@ func (e *Store) List(ctx context.Context, options *metainternalversion.ListOptio
 	if options != nil && options.LabelSelector != nil {
 		label = options.LabelSelector
 	}
-	value, found := label.RequiresExactMatch(fleetResourceViewKey)
-	if !found || value != string(includePropagated) {
-		require, err := labels.NewRequirement(karmadaManagedLabel, selection.NotEquals, []string{"true"})
-		if err != nil {
-			return nil, err
-		}
-		label = label.Add(*require)
+	label, err := filterByFleetResourceView(label)
+	if err != nil {
+		return nil, err
 	}
-	label = removeSpecifiedKey(label)
 
 	field := fields.Everything()
 	if options != nil && options.FieldSelector != nil {
@@ -384,6 +379,18 @@ func (e *Store) List(ctx context.Context, options *metainternalversion.ListOptio
 		e.Decorator(out)
 	}
 	return out, nil
+}
+
+func filterByFleetResourceView(label labels.Selector) (labels.Selector, error) {
+	value, found := label.RequiresExactMatch(fleetResourceViewKey)
+	if !found || value != string(includePropagated) {
+		require, err := labels.NewRequirement(karmadaManagedLabel, selection.NotEquals, []string{"true"})
+		if err != nil {
+			return nil, err
+		}
+		label = label.Add(*require)
+	}
+	return removeSpecifiedKey(label), nil
 }
 
 func removeSpecifiedKey(label labels.Selector) labels.Selector {
@@ -1448,20 +1455,20 @@ func (e *Store) Watch(ctx context.Context, options *metainternalversion.ListOpti
 	if options != nil && options.LabelSelector != nil {
 		label = options.LabelSelector
 	}
-	value, found := label.RequiresExactMatch(fleetResourceViewKey)
-	if !found || value != string(includePropagated) {
-		require, err := labels.NewRequirement(karmadaManagedLabel, selection.NotEquals, []string{"true"})
-		if err != nil {
-			return nil, err
-		}
-		label = label.Add(*require)
-	}
-	label = removeSpecifiedKey(label)
 
 	field := fields.Everything()
 	if options != nil && options.FieldSelector != nil {
 		field = options.FieldSelector
 	}
+	// Only if we watch resource list rather than single resource, add karmada.io/managed selector.
+	if _, ok := field.RequiresExactMatch("metadata.name"); !ok {
+		var err error
+		label, err = filterByFleetResourceView(label)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	predicate := e.PredicateFunc(label, field)
 
 	resourceVersion := ""
