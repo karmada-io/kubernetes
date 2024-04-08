@@ -227,8 +227,7 @@ func (f *FleetClientSet) ListPredicate(ctx context.Context, p storage.SelectionP
 			if err != nil {
 				return err
 			}
-			setName(accessor, clusterName)
-			accessor.SetResourceVersion(responseRV.String())
+			setNameAndResourceVersion(accessor, clusterName)
 
 			items = append(items, clone)
 			num++
@@ -556,8 +555,6 @@ func (f *FleetClientSet) WatchPredicate(ctx context.Context, p storage.Selection
 	}
 
 	mrv := newMultiClusterResourceVersionFromString(resourceVersion)
-	responseRV := newMultiClusterResourceVersionFromString(resourceVersion)
-	responseRVLock := sync.Mutex{}
 	setObjectRVFunc := func(cluster string, event *watch.Event) {
 		if event == nil {
 			return
@@ -589,12 +586,7 @@ func (f *FleetClientSet) WatchPredicate(ctx context.Context, p storage.Selection
 		if err != nil {
 			return
 		}
-		setName(accessor, cluster)
-
-		responseRVLock.Lock()
-		defer responseRVLock.Unlock()
-		responseRV.set(cluster, accessor.GetResourceVersion())
-		accessor.SetResourceVersion(responseRV.String())
+		setNameAndResourceVersion(accessor, cluster)
 	}
 
 	clusters, err := f.clustersLister()
